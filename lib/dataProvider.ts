@@ -3,6 +3,7 @@
 export interface CryptoData {
   id: string;
   symbol: string;
+  name: string;
   price: number;
   volume24h: number;
   change24h: number;
@@ -31,6 +32,7 @@ export async function fetchMarketData(ids: string[] = ['bitcoin', 'ethereum', 's
     return data.map((coin: any) => ({
       id: coin.id,
       symbol: coin.symbol.toUpperCase(),
+      name: coin.name || coin.id,
       price: coin.current_price || 0,
       volume24h: coin.total_volume || 0,
       change24h: coin.price_change_percentage_24h || 0,
@@ -41,6 +43,7 @@ export async function fetchMarketData(ids: string[] = ['bitcoin', 'ethereum', 's
     return ids.map((id) => ({
       id,
       symbol: id.substring(0, 3).toUpperCase(),
+      name: id.charAt(0).toUpperCase() + id.slice(1),
       price: Math.random() * 5000 + 100,
       volume24h: Math.random() * 500000000,
       change24h: (Math.random() * 10) - 5,
@@ -59,6 +62,7 @@ export async function fetchBroadMarket(): Promise<CryptoData[]> {
     return data.map((coin: any) => ({
       id: coin.id,
       symbol: coin.symbol.toUpperCase(),
+      name: coin.name || coin.id,
       price: coin.current_price || 0,
       volume24h: coin.total_volume || 0,
       change24h: coin.price_change_percentage_24h || 0,
@@ -66,7 +70,7 @@ export async function fetchBroadMarket(): Promise<CryptoData[]> {
     }));
   } catch (error) {
     console.warn('Broad market rate limit hit. Falling back to simulated broad items.');
-    return [{ id: 'global', symbol: 'GLBL', price: 1000, volume24h: 10000000, change24h: 2.5, image: '' }];
+    return [{ id: 'global', symbol: 'GLBL', name: 'Global Market', price: 1000, volume24h: 10000000, change24h: 2.5, image: '' }];
   }
 }
 
