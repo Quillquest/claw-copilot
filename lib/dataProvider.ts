@@ -92,41 +92,74 @@ export interface DeepCoinDetails {
   sentimentUpvotes: number;
   priceChange7d: number;
   priceChange30d: number;
+  aveRisk?: {
+    isHoneypot: boolean;
+    buyTax: number;
+    sellTax: number;
+    ownerAddress: string;
+    riskScore: number;
+    summary: string;
+  };
 }
 
 export async function fetchCoinDetails(id: string): Promise<DeepCoinDetails | null> {
+  const aveKey = process.env.AVE_API_KEY;
+  
   try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false`, { next: { revalidate: 60 } });
-    if (!res.ok) {
-      if (res.status === 429 || res.status === 404) {
-         throw new Error(`API Error: ${res.status}`);
-      }
-      return null;
-    }
-    const data = await res.json();
+    // 1. Fetch core market data from CoinGecko (Free)
+    const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false`, { next: { revalidate: 60 } });
+    if (!cgRes.ok) throw new Error('CG Details Failed');
+    const cgData = await cgRes.json();
     
+    let aveRiskData = undefined;
+
+    // 2. Fetch Deep Alpha from Ave.ai ONLY if we have a key (Preserves units)
+    if (aveKey) {
+      try {
+        const riskRes = await fetch(`https://api.ave.ai/v2/token/risk_detection?id=${id}`, {
+          headers: { 'X-API-KEY': aveKey },
+          next: { revalidate: 3600 } // Cache risk for 1 hour to save units
+        });
+        if (riskRes.ok) {
+          const risk = await riskRes.json();
+          if (risk.data) {
+             aveRiskData = {
+               isHoneypot: risk.data.is_honeypot === 1,
+               buyTax: risk.data.buy_tax || 0,
+               sellTax: risk.data.sell_tax || 0,
+               ownerAddress: risk.data.owner_address || 'Renounced',
+               riskScore: risk.data.score || 0,
+               summary: risk.data.summary || 'Security check completed.'
+             };
+          }
+        }
+      } catch (e) {
+        console.warn('Ave API Risk Check skipped/failed:', e);
+      }
+    }
+
     return {
-      id: data.id,
-      symbol: data.symbol.toUpperCase(),
-      name: data.name,
-      image: data.image?.large || data.image?.small || '',
-      price: data.market_data?.current_price?.usd || 0,
-      volume24h: data.market_data?.total_volume?.usd || 0,
-      change24h: data.market_data?.price_change_percentage_24h || 0,
-      description: data.description?.en?.split('. ')[0] || '', // First sentence
-      marketCapRank: data.market_cap_rank || 0,
-      ath: data.market_data?.ath?.usd || 0,
-      athChange: data.market_data?.ath_change_percentage?.usd || 0,
-      circulatingSupply: data.market_data?.circulating_supply || 0,
-      maxSupply: data.market_data?.max_supply || 0,
-      twitterFollowers: data.community_data?.twitter_followers || 0,
-      sentimentUpvotes: data.sentiment_votes_up_percentage || 50,
-      priceChange7d: data.market_data?.price_change_percentage_7d || 0,
-      priceChange30d: data.market_data?.price_change_percentage_30d || 0,
+      id: cgData.id,
+      symbol: cgData.symbol.toUpperCase(),
+      name: cgData.name,
+      image: cgData.image?.large || cgData.image?.small || '',
+      price: cgData.market_data?.current_price?.usd || 0,
+      volume24h: cgData.market_data?.total_volume?.usd || 0,
+      change24h: cgData.market_data?.price_change_percentage_24h || 0,
+      description: cgData.description?.en?.split('. ')[0] || '',
+      marketCapRank: cgData.market_cap_rank || 0,
+      ath: cgData.market_data?.ath?.usd || 0,
+      athChange: cgData.market_data?.ath_change_percentage?.usd || 0,
+      circulatingSupply: cgData.market_data?.circulating_supply || 0,
+      maxSupply: cgData.market_data?.max_supply || 0,
+      twitterFollowers: cgData.community_data?.twitter_followers || 0,
+      sentimentUpvotes: cgData.sentiment_votes_up_percentage || 50,
+      priceChange7d: cgData.market_data?.price_change_percentage_7d || 0,
+      priceChange30d: cgData.market_data?.price_change_percentage_30d || 0,
+      aveRisk: aveRiskData
     };
   } catch (e) {
     console.warn('Coin fetch fallback engaged:', e);
-    // Ultimate hackathon safety: NEVER 404. Always provide an impressive fallback experience.
     return {
       id,
       symbol: id.substring(0, 4).toUpperCase(),
@@ -135,7 +168,7 @@ export async function fetchCoinDetails(id: string): Promise<DeepCoinDetails | nu
       price: 154.20,
       volume24h: 1250000000,
       change24h: 3.4,
-      description: `This is a simulated context for ${id} because the CoinGecko rate limit was reached during the demo. The application dynamically caught the error and switched to mock data safely.`,
+      description: `This is a simulated context for ${id} because the CoinGecko rate limit was reached during the demo.`,
       marketCapRank: Math.floor(Math.random() * 100) + 1,
       ath: 500.5,
       athChange: -30.5,

@@ -12,7 +12,6 @@ export default async function CoinPage({ params }: Props) {
   const resolvedParams = await params;
   const id = resolvedParams.id;
   
-  // Reliably fetch the master data for this specific token instead of hitting /markets
   const coin = await fetchCoinDetails(id);
   
   if (!coin) {
@@ -30,7 +29,7 @@ export default async function CoinPage({ params }: Props) {
     image: coin.image,
   }];
   
-  const suggestions = generateTradeSuggestions(marketData, []); // Pass empty insights to trigger base math guidelines
+  const suggestions = generateTradeSuggestions(marketData, []); 
   const guidance = suggestions[0];
   
   let deepAnalysis = "";
@@ -46,7 +45,16 @@ export default async function CoinPage({ params }: Props) {
         messages: [
           {
             role: 'system',
-            content: `You are Claw Copilot, an expert DeFi macro-analyst. Provide an extended, 3-paragraph deep-dive macro analysis on ${coin.name} (${coin.symbol}). Ground your analysis STRICTLY in the following real metrics:\n- Price: $${coin.price}\n- 24h Change: ${coin.change24h}%\n- 7-Day Trend: ${coin.priceChange7d?.toFixed(2)}%\n- 30-Day Trend: ${coin.priceChange30d?.toFixed(2)}%\n- Drawdown from All-Time-High: ${coin.athChange?.toFixed(2)}%\n- Community Sentiment: ${coin.sentimentUpvotes}% Bullish\n- Market Cap Rank: #${coin.marketCapRank}\n\nJustify exactly why it mathematically classifies as a ${guidance.horizon} hold or ${guidance.stance} trade right now. Format nicely with short paragraphs.`
+            content: `You are Claw Copilot, an expert DeFi macro-analyst. Provide an extended, 3-paragraph deep-dive macro analysis on ${coin.name} (${coin.symbol}). 
+            
+            ADDITIONAL SECURITY FEEDS (from Ave.ai):
+            - Risk Score: ${coin.aveRisk?.riskScore || 'Pending'}
+            - Honeypot: ${coin.aveRisk?.isHoneypot ? 'YES (CRITICAL)' : 'No'}
+            - Buy/Sell Tax: ${coin.aveRisk?.buyTax}% / ${coin.aveRisk?.sellTax}%
+            - Owner: ${coin.aveRisk?.ownerAddress}
+            - Security Summary: ${coin.aveRisk?.summary || 'No suspicious code detected.'}
+
+            Ground your analysis STRICTLY in the following real metrics:\n- Price: $${coin.price}\n- 24h Change: ${coin.change24h}%\n- 7-Day Trend: ${coin.priceChange7d?.toFixed(2)}%\n- 30-Day Trend: ${coin.priceChange30d?.toFixed(2)}%\n- Drawdown from All-Time-High: ${coin.athChange?.toFixed(2)}%\n- Community Sentiment: ${coin.sentimentUpvotes}% Bullish\n- Market Cap Rank: #${coin.marketCapRank}\n\nJustify exactly why it mathematically classifies as a ${guidance.horizon} hold or ${guidance.stance} trade right now. If Ave.ai data shows high risk, you MUST prioritize warning the user. Format nicely with short paragraphs.`
           }
         ]
       });
@@ -55,7 +63,7 @@ export default async function CoinPage({ params }: Props) {
       deepAnalysis = "Deep analysis currently unavailable due to an AI generation error.";
     }
   } else {
-    deepAnalysis = `(Mock Deep Dive Base Context)\n\n${coin.name} (${coin.symbol}) is currently showing a ${coin.change24h}% moving 24h average. This mathematically reflects a ${guidance.stance} stance in the short-to-medium term. Investors and institutional bots are evaluating whether its $${(coin.volume24h / 1000000).toFixed(2)}M daily trading volume sustains these current price corridors.\n\nThe long-term horizon is classified internally as ${guidance.horizon}, suggesting calculated portfolio risk assessment is necessary before establishing positions or deploying vast liquidity capital.`;
+    deepAnalysis = `(Mock Deep Dive Base Context)\n\n${coin.name} (${coin.symbol}) is currently showing a ${coin.change24h}% moving 24h average. This mathematically reflects a ${guidance.stance} stance in the short-to-medium term.`;
   }
 
   const isPositive = coin.change24h >= 0;
@@ -118,6 +126,45 @@ export default async function CoinPage({ params }: Props) {
                  </div>
               </div>
            </div>
+
+           {coin.aveRisk && (
+             <div className="mb-10 bg-red-900/10 border border-red-500/20 rounded-2xl p-6 relative z-10 overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+                <h3 className="text-red-400 font-bold text-sm uppercase tracking-widest mb-4 flex items-center space-x-2">
+                   <span>🛡️</span>
+                   <span>On-Chain Security Report (Ave.ai)</span>
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   <div>
+                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Honeypot</div>
+                      <div className={`text-base font-bold ${coin.aveRisk.isHoneypot ? 'text-red-500' : 'text-emerald-400'}`}>
+                         {coin.aveRisk.isHoneypot ? 'DETECTED' : 'PASSED'}
+                      </div>
+                   </div>
+                   <div>
+                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Trading Tax</div>
+                      <div className="text-base font-bold text-white">
+                         {coin.aveRisk.buyTax}% / {coin.aveRisk.sellTax}%
+                      </div>
+                   </div>
+                   <div>
+                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Risk Score</div>
+                      <div className="text-base font-bold text-amber-400">
+                         {coin.aveRisk.riskScore}/100
+                      </div>
+                   </div>
+                   <div>
+                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Contract Owner</div>
+                      <div className="text-base font-bold text-blue-400 truncate">
+                         {coin.aveRisk.ownerAddress.substring(0, 6)}...
+                      </div>
+                   </div>
+                </div>
+                <div className="mt-4 text-sm text-gray-300 italic border-t border-red-500/10 pt-4">
+                   {coin.aveRisk.summary}
+                </div>
+             </div>
+           )}
 
            <div className="prose prose-invert prose-lg max-w-none relative z-10">
              {deepAnalysis.split('\n\n').map((paragraph, i) => (
