@@ -57,8 +57,10 @@ export default function TradePanel() {
             <div key={i} className="bg-gray-900/60 rounded-xl p-4 border border-gray-700/60 flex flex-col space-y-3 hover:border-gray-500/50 transition-colors">
               <div className="flex flex-wrap justify-between items-center gap-y-2">
                  <Link href={`/coin/${item.asset}`} className="flex items-center space-x-2 pr-2 group transition-opacity">
-                   <img src={item.image} alt={item.asset} className="w-6 h-6 rounded-full group-hover:scale-110 transition-transform" />
-                   <h4 className="font-bold text-white capitalize text-base tracking-wide group-hover:text-amber-400 transition-colors">{item.asset}</h4>
+                    {item.image && (
+                      <img src={item.image} alt={item.asset} className="w-6 h-6 rounded-full group-hover:scale-110 transition-transform" />
+                    )}
+                    <h4 className="font-bold text-white capitalize text-base tracking-wide group-hover:text-amber-400 transition-colors">{item.asset}</h4>
                  </Link>
                  <div className="flex space-x-2">
                    <div className={`whitespace-nowrap px-2 py-0.5 rounded-md text-[11px] sm:text-xs font-bold border ${getHorizonStyle(item.horizon)}`}>

@@ -17,7 +17,9 @@ export default function PriceCard({ data }: PriceCardProps) {
 
         <div className="flex justify-between items-center mb-4 relative z-10">
           <div className="flex items-center space-x-3">
-            <img src={data.image} alt={data.id} className="w-8 h-8 rounded-full shadow-sm bg-gray-900/50 p-0.5 group-hover:rotate-12 transition-transform duration-300" />
+            {data.image && (
+              <img src={data.image} alt={data.id} className="w-8 h-8 rounded-full shadow-sm bg-gray-900/50 p-0.5 group-hover:rotate-12 transition-transform duration-300" />
+            )}
             <h3 className="text-xl font-bold capitalize tracking-wide">{data.id}</h3>
           </div>
           <span className="text-xs font-bold px-2 py-1 bg-gray-700/80 rounded-md text-gray-300 tracking-wider uppercase backdrop-blur-sm">

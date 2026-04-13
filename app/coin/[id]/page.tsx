@@ -18,7 +18,6 @@ export default async function CoinPage({ params }: Props) {
     notFound();
   }
   
-  // Format as generic array so our trade/math service algorithm works flawlessly
   const marketData = [{
     id: coin.id,
     symbol: coin.symbol,
@@ -45,133 +44,94 @@ export default async function CoinPage({ params }: Props) {
         messages: [
           {
             role: 'system',
-            content: `You are Claw Copilot, an expert DeFi macro-analyst. Provide an extended, 3-paragraph deep-dive macro analysis on ${coin.name} (${coin.symbol}). 
-            
-            ADDITIONAL SECURITY FEEDS (from Ave.ai):
-            - Risk Score: ${coin.aveRisk?.riskScore || 'Pending'}
-            - Honeypot: ${coin.aveRisk?.isHoneypot ? 'YES (CRITICAL)' : 'No'}
-            - Buy/Sell Tax: ${coin.aveRisk?.buyTax}% / ${coin.aveRisk?.sellTax}%
-            - Owner: ${coin.aveRisk?.ownerAddress}
-            - Security Summary: ${coin.aveRisk?.summary || 'No suspicious code detected.'}
-
-            Ground your analysis STRICTLY in the following real metrics:\n- Price: $${coin.price}\n- 24h Change: ${coin.change24h}%\n- 7-Day Trend: ${coin.priceChange7d?.toFixed(2)}%\n- 30-Day Trend: ${coin.priceChange30d?.toFixed(2)}%\n- Drawdown from All-Time-High: ${coin.athChange?.toFixed(2)}%\n- Community Sentiment: ${coin.sentimentUpvotes}% Bullish\n- Market Cap Rank: #${coin.marketCapRank}\n\nJustify exactly why it mathematically classifies as a ${guidance.horizon} hold or ${guidance.stance} trade right now. If Ave.ai data shows high risk, you MUST prioritize warning the user. Format nicely with short paragraphs.`
+            content: `You are Claw Copilot, an expert DeFi analyst. Analyze ${coin.name}. 
+            Ave.ai Security: Honeypot=${coin.aveRisk?.isHoneypot ? 'Yes' : 'No'}, Score=${coin.aveRisk?.riskScore}/100, Tax=${coin.aveRisk?.buyTax}%/ ${coin.aveRisk?.sellTax}%.
+            Metrics: Price $${coin.price}, Change ${coin.change24h}%. 
+            Provide 3 paragraphs of deep analysis. Summarize risk first if high.`
           }
         ]
       });
       deepAnalysis = response.choices[0]?.message?.content || "Analysis unavailable.";
     } catch (e) {
-      deepAnalysis = "Deep analysis currently unavailable due to an AI generation error.";
+      deepAnalysis = "AI Analysis Error.";
     }
-  } else {
-    deepAnalysis = `(Mock Deep Dive Base Context)\n\n${coin.name} (${coin.symbol}) is currently showing a ${coin.change24h}% moving 24h average. This mathematically reflects a ${guidance.stance} stance in the short-to-medium term.`;
   }
 
   const isPositive = coin.change24h >= 0;
 
   return (
-    <div className="min-h-screen bg-[#0a0f1a] text-gray-100 p-8 font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#0a0f1a] text-gray-100 p-8">
       <div className="max-w-4xl mx-auto">
-        <Link href="/dashboard" className="inline-flex items-center text-blue-400 hover:text-blue-300 font-medium mb-8 transition-colors group">
-          <span className="mr-2 transform group-hover:-translate-x-1 transition-transform">←</span>
-          Back to Dashboard
+        <Link href="/dashboard" className="text-blue-400 hover:text-blue-300 font-medium mb-8 inline-block">
+          ← Back to Dashboard
         </Link>
         
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-12 bg-gray-900/40 p-8 rounded-3xl border border-gray-800/60 shadow-2xl backdrop-blur-md">
-           <div className="flex items-center space-x-6 mb-6 md:mb-0">
-             <img src={coin.image} alt={coin.name} className="w-20 h-20 rounded-full shadow-lg bg-gray-800 p-1 border border-gray-700/50" />
+        <header className="bg-gray-900/40 p-8 rounded-3xl border border-gray-800/60 mb-8 flex justify-between items-center">
+           <div className="flex items-center space-x-6">
+             <img src={coin.image} alt={coin.name} className="w-16 h-16 rounded-full shadow-lg" />
              <div>
-               <h1 className="text-5xl font-extrabold text-white capitalize tracking-tight mb-2 flex items-center space-x-4">
+               <h1 className="text-4xl font-extrabold text-white flex items-center space-x-3">
                  <span>{coin.name}</span>
-                 <span className="text-xl font-bold px-3 py-1 bg-gray-800 rounded-lg text-gray-300 tracking-wider uppercase border border-gray-700/50">{coin.symbol}</span>
+                 <span className="text-sm px-2 py-1 bg-gray-800 rounded uppercase">{coin.symbol}</span>
                </h1>
-               <div className="text-3xl font-light text-gray-300 tracking-wide">
-                 ${coin.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
-               </div>
+               <div className="text-2xl text-gray-300">${coin.price.toLocaleString()}</div>
              </div>
            </div>
            
-           <div className="flex flex-col items-end justify-center space-y-3">
-             <div className={`px-5 py-2 rounded-xl text-xl font-bold flex items-center space-x-2 shadow-inner border ${isPositive ? 'bg-emerald-900/20 text-emerald-400 border-emerald-800/40' : 'bg-red-900/20 text-red-400 border-red-800/40'}`}>
-                <span>{isPositive ? '▲' : '▼'}</span>
-                <span>{Math.abs(coin.change24h).toFixed(2)}%</span>
+           <div className="text-right">
+             <div className={`text-xl font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                {isPositive ? '▲' : '▼'}{Math.abs(coin.change24h).toFixed(2)}%
              </div>
-             <div className="text-gray-400 font-medium tracking-wide">
-                24h Vol: <span className="text-white">${(coin.volume24h / 1000000).toLocaleString(undefined, { maximumFractionDigits: 2 })}M</span>
-             </div>
+             <div className="text-gray-500 text-sm">24h Vol: ${(coin.volume24h / 1000000).toFixed(1)}M</div>
            </div>
         </header>
 
-        <section className="bg-gray-800/30 rounded-3xl p-8 border border-gray-700/50 backdrop-blur-md mb-8 relative overflow-hidden shadow-xl">
-           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none"></div>
-           <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 blur-[100px] rounded-full pointer-events-none"></div>
-           
-           <h2 className="text-2xl font-bold mb-8 flex items-center space-x-3 text-white border-b border-gray-700/50 pb-4 relative z-10">
-             <span className="text-3xl drop-shadow-md">🧠</span> 
-             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-300">
-               Claw AI Deep Analysis
-             </span>
+        <section className="bg-gray-800/30 rounded-3xl p-8 border border-gray-700/50 backdrop-blur-md mb-8">
+           <h2 className="text-2xl font-bold mb-6 flex items-center space-x-3 text-white">
+             <span>🧠</span> 
+             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-300">Claw AI Deep Analysis</span>
            </h2>
            
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 relative z-10">
-              <div className="bg-gray-900/60 rounded-2xl p-6 border border-gray-700/60 flex flex-col justify-center shadow-inner">
-                 <div className="text-sm text-gray-400 font-semibold uppercase tracking-widest mb-2">Market Action Stance</div>
-                 <div className={`text-2xl font-black ${guidance.stance === 'BULLISH' ? 'text-emerald-400' : guidance.stance === 'BEARISH' ? 'text-red-400' : 'text-amber-400'}`}>
-                   {guidance.stance}
-                 </div>
+           <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-gray-900/60 rounded-2xl p-4 border border-gray-700/60 text-center">
+                 <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Market Stance</div>
+                 <div className={`text-xl font-bold ${guidance.stance === 'BULLISH' ? 'text-emerald-400' : 'text-red-400'}`}>{guidance.stance}</div>
               </div>
-              <div className="bg-gray-900/60 rounded-2xl p-6 border border-gray-700/60 flex flex-col justify-center shadow-inner">
-                 <div className="text-sm text-gray-400 font-semibold uppercase tracking-widest mb-2">Investment Horizon</div>
-                 <div className="text-2xl font-black text-purple-400">
-                   {guidance.horizon}
-                 </div>
+              <div className="bg-gray-900/60 rounded-2xl p-4 border border-gray-700/60 text-center">
+                 <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Horizon</div>
+                 <div className="text-xl font-bold text-purple-400">{guidance.horizon}</div>
               </div>
            </div>
 
            {coin.aveRisk && (
-             <div className="mb-10 bg-red-900/10 border border-red-500/20 rounded-2xl p-6 relative z-10 overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-                <h3 className="text-red-400 font-bold text-sm uppercase tracking-widest mb-4 flex items-center space-x-2">
-                   <span>🛡️</span>
-                   <span>On-Chain Security Report (Ave.ai)</span>
+             <div className="mb-8 p-6 bg-red-900/10 border border-red-500/20 rounded-2xl">
+                <h3 className="text-red-400 font-bold text-xs uppercase tracking-widest mb-4 flex items-center space-x-2">
+                   <span>🛡️ Security Report (Ave.ai)</span>
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                    <div>
-                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Honeypot</div>
-                      <div className={`text-base font-bold ${coin.aveRisk.isHoneypot ? 'text-red-500' : 'text-emerald-400'}`}>
-                         {coin.aveRisk.isHoneypot ? 'DETECTED' : 'PASSED'}
-                      </div>
+                      <div className="text-[10px] text-gray-500 uppercase">Honeypot</div>
+                      <div className={`text-sm font-bold ${coin.aveRisk.isHoneypot ? 'text-red-500' : 'text-emerald-400'}`}>{coin.aveRisk.isHoneypot ? 'YES' : 'No'}</div>
                    </div>
                    <div>
-                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Trading Tax</div>
-                      <div className="text-base font-bold text-white">
-                         {coin.aveRisk.buyTax}% / {coin.aveRisk.sellTax}%
-                      </div>
+                      <div className="text-[10px] text-gray-500 uppercase">Taxes</div>
+                      <div className="text-sm font-bold text-white">{coin.aveRisk.buyTax}% / {coin.aveRisk.sellTax}%</div>
                    </div>
                    <div>
-                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Risk Score</div>
-                      <div className="text-base font-bold text-amber-400">
-                         {coin.aveRisk.riskScore}/100
-                      </div>
+                      <div className="text-[10px] text-gray-500 uppercase">Risk Score</div>
+                      <div className="text-sm font-bold text-amber-400">{coin.aveRisk.riskScore}/100</div>
                    </div>
                    <div>
-                      <div className="text-xs text-gray-500 font-bold uppercase mb-1">Contract Owner</div>
-                      <div className="text-base font-bold text-blue-400 truncate">
-                         {coin.aveRisk.ownerAddress.substring(0, 6)}...
-                      </div>
+                      <div className="text-[10px] text-gray-500 uppercase">Owner</div>
+                      <div className="text-sm font-bold text-blue-400 truncate">{coin.aveRisk.ownerAddress.substring(0,6)}...</div>
                    </div>
                 </div>
-                <div className="mt-4 text-sm text-gray-300 italic border-t border-red-500/10 pt-4">
-                   {coin.aveRisk.summary}
-                </div>
+                <p className="text-xs text-gray-400 italic pt-2 border-t border-gray-700/50">{coin.aveRisk.summary}</p>
              </div>
            )}
 
-           <div className="prose prose-invert prose-lg max-w-none relative z-10">
-             {deepAnalysis.split('\n\n').map((paragraph, i) => (
-                <p key={i} className="text-gray-300 leading-relaxed tracking-wide mb-6">
-                   {paragraph}
-                </p>
-             ))}
+           <div className="text-gray-300 leading-relaxed space-y-4">
+              {deepAnalysis.split('\n\n').map((p, i) => <p key={i}>{p}</p>)}
            </div>
         </section>
       </div>

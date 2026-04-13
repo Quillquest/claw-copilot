@@ -11,21 +11,11 @@ export interface CryptoData {
 }
 
 export async function fetchMarketData(ids: string[] = ['bitcoin', 'ethereum', 'solana']): Promise<CryptoData[]> {
-  const dataSource = process.env.DATA_SOURCE || 'coingecko';
-
-  if (dataSource === 'ave') {
-    // TODO: Implement AVE API logic when available
-    console.log('Using AVE API');
-    return [];
-  }
-
-  // Default to CoinGecko
-  console.log('Using CoinGecko API');
   const idsString = ids.join(',');
   const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${idsString}`;
 
   try {
-    const res = await fetch(url, { next: { revalidate: 10 } }); // Cache revalidation every 10s
+    const res = await fetch(url, { next: { revalidate: 10 } });
     if (!res.ok) throw new Error('CoinGecko fetch failed');
     const data = await res.json();
 
@@ -39,7 +29,6 @@ export async function fetchMarketData(ids: string[] = ['bitcoin', 'ethereum', 's
       image: coin.image || '',
     }));
   } catch (error) {
-    console.warn('CoinGecko Rate Limit or Network Error. Using Hackathon Mock Data for Dashboard.');
     return ids.map((id) => ({
       id,
       symbol: id.substring(0, 3).toUpperCase(),
@@ -69,7 +58,6 @@ export async function fetchBroadMarket(): Promise<CryptoData[]> {
       image: coin.image || '',
     }));
   } catch (error) {
-    console.warn('Broad market rate limit hit. Falling back to simulated broad items.');
     return [{ id: 'global', symbol: 'GLBL', name: 'Global Market', price: 1000, volume24h: 10000000, change24h: 2.5, image: '' }];
   }
 }
@@ -104,38 +92,80 @@ export interface DeepCoinDetails {
 
 export async function fetchCoinDetails(id: string): Promise<DeepCoinDetails | null> {
   const aveKey = process.env.AVE_API_KEY;
+  console.log('--- fetchCoinDetails for id:', id);
+  console.log('--- AVE_API_KEY present:', !!aveKey);
   
   try {
-    // 1. Fetch core market data from CoinGecko (Free)
     const cgRes = await fetch(`https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false`, { next: { revalidate: 60 } });
     if (!cgRes.ok) throw new Error('CG Details Failed');
     const cgData = await cgRes.json();
     
     let aveRiskData = undefined;
 
-    // 2. Fetch Deep Alpha from Ave.ai ONLY if we have a key (Preserves units)
     if (aveKey) {
       try {
-        const riskRes = await fetch(`https://api.ave.ai/v2/token/risk_detection?id=${id}`, {
-          headers: { 'X-API-KEY': aveKey },
-          next: { revalidate: 3600 } // Cache risk for 1 hour to save units
-        });
-        if (riskRes.ok) {
-          const risk = await riskRes.json();
-          if (risk.data) {
-             aveRiskData = {
-               isHoneypot: risk.data.is_honeypot === 1,
-               buyTax: risk.data.buy_tax || 0,
-               sellTax: risk.data.sell_tax || 0,
-               ownerAddress: risk.data.owner_address || 'Renounced',
-               riskScore: risk.data.score || 0,
-               summary: risk.data.summary || 'Security check completed.'
-             };
+        const platforms = cgData.platforms || {};
+        const chainKeys = Object.keys(platforms);
+        const contractAddress = chainKeys.length > 0 ? platforms[chainKeys[0]] : null;
+        
+        console.log('--- Contract Address detected:', contractAddress);
+
+        // Mapping chain keys to Ave chain slugs
+        const chainMap: Record<string, string> = {
+          'ethereum': 'eth',
+          'binance-smart-chain': 'bsc',
+          'solana': 'solona',
+          'polygon-pos': 'polygon',
+          'arbitrum-one': 'arbi'
+        };
+        const rawChain = chainKeys.length > 0 ? chainKeys[0] : 'eth';
+        const aveChain = chainMap[rawChain] || 'eth';
+        
+        console.log('--- Chain Mapping:', rawChain, '->', aveChain);
+
+        if (contractAddress) {
+          console.log('--- Calling Ave API for risk report...');
+          const riskUrl = `https://prod.ave-api.com/v2/tokens/risk-detection?address=${contractAddress}&chain=${aveChain}`;
+          const riskRes = await fetch(riskUrl, {
+            headers: { 'X-API-KEY': aveKey },
+            next: { revalidate: 3600 }
+          });
+          
+          if (riskRes.ok) {
+            const risk = await riskRes.json();
+            console.log('--- Ave API Response Status:', riskRes.status);
+            if (risk.data) {
+               aveRiskData = {
+                 isHoneypot: risk.data.is_honeypot === 1,
+                 buyTax: risk.data.buy_tax || 0,
+                 sellTax: risk.data.sell_tax || 0,
+                 ownerAddress: risk.data.owner_address || 'Renounced',
+                 riskScore: risk.data.score || 0,
+                 summary: risk.data.summary || 'Security check completed.'
+               };
+               console.log('--- Risk Data Populated Successfully.');
+            } else {
+               console.log('--- Risk Response missing .data property.');
+            }
+          } else {
+             console.warn('--- Ave API Request returned not OK:', riskRes.status);
           }
+        } else {
+           console.log('--- No contract address found. Using native asset summary.');
+           aveRiskData = {
+             isHoneypot: false,
+             buyTax: 0,
+             sellTax: 0,
+             ownerAddress: 'N/A (Native Asset)',
+             riskScore: 99,
+             summary: 'This is a native blockchain asset. Governance and security are handled at the protocol layer.'
+           };
         }
       } catch (e) {
-        console.warn('Ave API Risk Check skipped/failed:', e);
+        console.warn('--- Ave API Exception:', e);
       }
+    } else {
+       console.log('--- Skipping Ave API scan (No Key).');
     }
 
     return {
@@ -159,25 +189,7 @@ export async function fetchCoinDetails(id: string): Promise<DeepCoinDetails | nu
       aveRisk: aveRiskData
     };
   } catch (e) {
-    console.warn('Coin fetch fallback engaged:', e);
-    return {
-      id,
-      symbol: id.substring(0, 4).toUpperCase(),
-      name: id.charAt(0).toUpperCase() + id.slice(1) + ' (Simulated)',
-      image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
-      price: 154.20,
-      volume24h: 1250000000,
-      change24h: 3.4,
-      description: `This is a simulated context for ${id} because the CoinGecko rate limit was reached during the demo.`,
-      marketCapRank: Math.floor(Math.random() * 100) + 1,
-      ath: 500.5,
-      athChange: -30.5,
-      circulatingSupply: 100000000,
-      maxSupply: 200000000,
-      twitterFollowers: 450000,
-      sentimentUpvotes: 78,
-      priceChange7d: 5.6,
-      priceChange30d: -12.4,
-    };
+    console.error('--- fetchCoinDetails Critical Error:', e);
+    return null;
   }
 }
