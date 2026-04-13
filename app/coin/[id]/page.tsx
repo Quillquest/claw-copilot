@@ -23,6 +23,7 @@ export default async function CoinPage({ params }: Props) {
   const marketData = [{
     id: coin.id,
     symbol: coin.symbol,
+    name: coin.name,
     price: coin.price,
     volume24h: coin.volume24h,
     change24h: coin.change24h,
